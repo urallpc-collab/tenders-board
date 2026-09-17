@@ -3,156 +3,208 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="robots" content="noindex, nofollow, noarchive">
-  <title>Согласование тендеров</title>
+  <title>Тендерный отдел — Согласование</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    body { background-color: #0f172a; color: #f8fafc; }
+    .glass { background: #1e293b; border: 1px solid #334155; }
+    .prose-dark { color: #cbd5e1; }
+    .prose-dark h1, .prose-dark h2, .prose-dark h3 { color: #f8fafc; font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem; }
+    .prose-dark strong { color: #38bdf8; }
+    .prose-dark ul { list-style-type: disc; padding-left: 1.25rem; }
+  </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-4 font-sans">
-  <div class="max-w-md mx-auto">
-    
-    <!-- Шапка -->
-    <header class="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
-      <div>
-        <h1 class="text-xl font-bold text-emerald-400">Тендерный отдел</h1>
-        <p class="text-xs text-slate-400">На согласовании (Колонка 02)</p>
-      </div>
-      <button onclick="clearToken()" class="text-xs text-slate-500 hover:text-rose-400 underline">Выйти</button>
-    </header>
+<body class="min-h-screen p-4 md:p-8">
 
-    <!-- Форма авторизации Token (показывается, если не сохранен) -->
-    <div id="auth-card" class="bg-slate-800 p-5 rounded-2xl mb-6 border border-slate-700 shadow-xl">
-      <h2 class="text-sm font-semibold mb-2 text-slate-200">Авторизация доступа</h2>
-      <p class="text-xs text-slate-400 mb-4">Введите токен доступа GitHub (PAT) для управления тендерами.</p>
-      <input type="password" id="pat-token" class="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm mb-3 focus:outline-none focus:border-emerald-500 text-slate-100" placeholder="ghp_xxxxxxxxxxxx">
-      <button onclick="saveToken()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-semibold text-sm transition active:scale-95">Сохранить и войти</button>
+  <!-- Header -->
+  <header class="max-w-6xl mx-auto mb-6 flex justify-between items-center border-b border-slate-700 pb-4">
+    <div>
+      <h1 class="text-2xl font-bold text-emerald-400">Тендерный отдел</h1>
+      <p class="text-xs text-slate-400">Панель согласования закупок</p>
     </div>
+    <button id="logoutBtn" onclick="logout()" class="hidden text-sm text-red-400 hover:underline">Выйти</button>
+  </header>
 
-    <!-- Индикатор загрузки -->
-    <div id="loading" class="hidden text-center py-8 text-slate-400 text-sm">
-      Загрузка актуальных тендеров...
-    </div>
-
-    <!-- Список тендеров -->
-    <div id="tenders-container" class="space-y-4"></div>
-
+  <!-- Auth Screen -->
+  <div id="authScreen" class="max-w-md mx-auto mt-20 glass rounded-xl p-6 shadow-xl">
+    <h2 class="text-lg font-semibold mb-2">Авторизация доступа</h2>
+    <p class="text-xs text-slate-400 mb-4">Введите ваш GitHub Personal Access Token (PAT) для доступа к файлам.</p>
+    <input type="password" id="patInput" placeholder="ghp_xxxxxxxxxxxx" class="w-full p-3 rounded-lg bg-slate-900 border border-slate-700 text-sm mb-4 focus:outline-none focus:border-emerald-500">
+    <button onclick="saveToken()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-medium py-3 rounded-lg transition">Сохранить и войти</button>
   </div>
+
+  <!-- App Main Layout -->
+  <main id="appLayout" class="max-w-6xl mx-auto hidden">
+    
+    <!-- VIEW 1: LIST / TABLE -->
+    <section id="listView" class="space-y-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold text-slate-200">Список тендеров на рассмотрении</h2>
+        <button onclick="loadTenders()" class="text-xs text-emerald-400 hover:underline">🔄 Обновить список</button>
+      </div>
+
+      <div class="glass rounded-xl overflow-hidden shadow-lg">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-slate-800 text-slate-400 border-b border-slate-700">
+            <tr>
+              <th class="p-4">#</th>
+              <th class="p-4">Файл / Название</th>
+              <th class="p-4 text-right">Действие</th>
+            </tr>
+          </thead>
+          <tbody id="tendersTableBody" class="divide-y divide-slate-700/50">
+            <!-- Items injected by JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- VIEW 2: FULL DETAILS -->
+    <section id="detailView" class="hidden space-y-6">
+      <button onclick="showList()" class="inline-flex items-center gap-2 text-sm text-emerald-400 hover:text-emerald-300 font-medium">
+        ← Назад к списку тендеров
+      </button>
+
+      <div class="glass rounded-xl p-6 shadow-xl space-y-6">
+        <div class="border-b border-slate-700 pb-4">
+          <span id="detailBadge" class="text-xs bg-emerald-900/60 text-emerald-400 px-2.5 py-1 rounded-full font-mono">Файл</span>
+          <h2 id="detailTitle" class="text-2xl font-bold mt-2 text-white"></h2>
+        </div>
+
+        <!-- Full Document Body -->
+        <div id="detailContent" class="prose-dark text-sm leading-relaxed space-y-3 bg-slate-900/50 p-6 rounded-lg border border-slate-800 max-h-[65vh] overflow-y-auto">
+          <!-- Markdown Content -->
+        </div>
+
+        <!-- Comment & Actions -->
+        <div class="border-t border-slate-700 pt-4 space-y-4">
+          <textarea id="commentInput" rows="2" placeholder="Замечание или комментарий (необязательно)..." class="w-full p-3 rounded-lg bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:border-emerald-500"></textarea>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <button onclick="submitDecision('Согласовано')" class="w-full bg-emerald-600 hover:bg-emerald-500 font-semibold py-3 rounded-lg transition flex justify-center items-center gap-2">
+              <span>🟢</span> Согласовать
+            </button>
+            <button onclick="submitDecision('Отклонено')" class="w-full bg-rose-600 hover:bg-rose-500 font-semibold py-3 rounded-lg transition flex justify-center items-center gap-2">
+              <span>🔴</span> Отклонить
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
 
   <script>
     const REPO_OWNER = 'urallpc-collab';
     const REPO_NAME = 'tenders-board';
+    let currentTenders = [];
+    let selectedTender = null;
 
-    function getToken() {
-      return localStorage.getItem('gh_pat_token') || '';
-    }
+    function getToken() { return localStorage.getItem('github_pat'); }
 
     function saveToken() {
-      const token = document.getElementById('pat-token').value.trim();
-      if (token) {
-        localStorage.setItem('gh_pat_token', token);
-        initDashboard();
+      const val = document.getElementById('patInput').value.trim();
+      if (val) {
+        localStorage.setItem('github_pat', val);
+        initApp();
       }
     }
 
-    function clearToken() {
-      localStorage.removeItem('gh_pat_token');
+    function logout() {
+      localStorage.removeItem('github_pat');
       location.reload();
     }
 
-    async function initDashboard() {
+    async function initApp() {
       const token = getToken();
       if (!token) {
-        document.getElementById('auth-card').classList.remove('hidden');
+        document.getElementById('authScreen').classList.remove('hidden');
+        document.getElementById('appLayout').classList.add('hidden');
+        document.getElementById('logoutBtn').classList.add('hidden');
         return;
       }
-      document.getElementById('auth-card').classList.add('hidden');
-      document.getElementById('loading').classList.remove('hidden');
+
+      document.getElementById('authScreen').classList.add('hidden');
+      document.getElementById('appLayout').classList.remove('hidden');
+      document.getElementById('logoutBtn').classList.remove('hidden');
+
+      await loadTenders();
+    }
+
+    async function loadTenders() {
+      const token = getToken();
+      const tbody = document.getElementById('tendersTableBody');
+      tbody.innerHTML = `<tr><td colspan="3" class="p-6 text-center text-slate-400">Загрузка списка тендеров...</td></tr>`;
 
       try {
-        // Получаем карточки из репозитория
-        const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues?state=open`, {
+        const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/`, {
           headers: { 'Authorization': `token ${token}` }
         });
-        const issues = await res.json();
+        const files = await res.json();
         
-        document.getElementById('loading').classList.add('hidden');
-        renderTenders(issues);
-      } catch (err) {
-        alert('Ошибка загрузки данных. Проверьте токен.');
-        document.getElementById('loading').classList.add('hidden');
-        document.getElementById('auth-card').classList.remove('hidden');
-      }
-    }
+        // Filter .md files excluding README.md
+        currentTenders = files.filter(f => f.name.endsWith('.md') && f.name.toLowerCase() !== 'readme.md');
 
-    function renderTenders(issues) {
-      const container = document.getElementById('tenders-container');
-      container.innerHTML = '';
+        if (currentTenders.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="3" class="p-6 text-center text-slate-400">Тендеры для согласования не найдены.</td></tr>`;
+          return;
+        }
 
-      if (!issues || issues.length === 0) {
-        container.innerHTML = `<div class="text-center py-10 text-slate-500 text-sm">Нет тендеров, требующих согласования 🎉</div>`;
-        return;
-      }
-
-      issues.forEach(issue => {
-        const card = document.createElement('div');
-        card.className = 'bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg space-y-4';
-        
-        card.innerHTML = `
-          <div>
-            <span class="text-xs font-mono text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">#${issue.number}</span>
-            <h3 class="text-base font-bold text-slate-100 mt-2 leading-snug">${issue.title}</h3>
-          </div>
-          
-          <div class="text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 whitespace-pre-line max-h-48 overflow-y-auto">
-            ${issue.body || 'Описание отсутствует.'}
-          </div>
-
-          <div class="space-y-2 pt-2 border-t border-slate-700/60">
-            <textarea id="comment-${issue.number}" class="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500" placeholder="Замечание или комментарий (необязательно)..." rows="2"></textarea>
-            
-            <div class="grid grid-cols-2 gap-2">
-              <button onclick="decision(${issue.number}, '03. Идем в торги')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold text-xs transition active:scale-95 shadow-md">
-                🟢 Согласовать
-              </button>
-              <button onclick="decision(${issue.number}, '04. Отказ')" class="w-full bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-xl font-bold text-xs transition active:scale-95 shadow-md">
-                🔴 Отклонить
-              </button>
-            </div>
-          </div>
-        `;
-        container.appendChild(card);
-      });
-    }
-
-    async function decision(issueNumber, targetStatus) {
-      const token = getToken();
-      const commentText = document.getElementById(`comment-${issueNumber}`).value.trim();
-
-      if (commentText) {
-        await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issueNumber}/comments`, {
-          method: 'POST',
-          headers: { 
-            'Authorization': `token ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ body: `**Решение руководителя:** ${commentText}` })
+        tbody.innerHTML = '';
+        currentTenders.forEach((item, idx) => {
+          const row = document.createElement('tr');
+          row.className = 'hover:bg-slate-800/50 transition cursor-pointer';
+          row.onclick = () => openDetail(idx);
+          row.innerHTML = `
+            <td class="p-4 font-mono text-xs text-emerald-400">#${idx + 1}</td>
+            <td class="p-4 font-medium text-slate-200">${item.name.replace('.md', '')}</td>
+            <td class="p-4 text-right">
+              <button class="bg-slate-700 hover:bg-slate-600 text-xs px-3 py-1.5 rounded-lg text-emerald-400 transition">Открыть →</button>
+            </td>
+          `;
+          tbody.appendChild(row);
         });
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="3" class="p-6 text-center text-red-400">Ошибка загрузки: Проверьте токен и права.</td></tr>`;
       }
-
-      // Закрываем или обновляем issue
-      await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issueNumber}`, {
-        method: 'PATCH',
-        headers: { 
-          'Authorization': `token ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ state: targetStatus.includes('Отказ') ? 'closed' : 'open' })
-      });
-
-      initDashboard();
     }
 
-    // Автостарт
-    initDashboard();
+    async function openDetail(idx) {
+      const token = getToken();
+      selectedTender = currentTenders[idx];
+      
+      document.getElementById('detailTitle').innerText = selectedTender.name.replace('.md', '');
+      document.getElementById('detailBadge').innerText = selectedTender.name;
+      document.getElementById('detailContent').innerHTML = 'Загрузка содержимого тендера...';
+
+      document.getElementById('listView').classList.add('hidden');
+      document.getElementById('detailView').classList.remove('hidden');
+
+      try {
+        const res = await fetch(selectedTender.download_url);
+        const text = await res.text();
+        document.getElementById('detailContent').innerHTML = marked.parse(text);
+      } catch (err) {
+        document.getElementById('detailContent').innerHTML = '<span class="text-red-400">Не удалось загрузить содержимое файла.</span>';
+      }
+    }
+
+    function showList() {
+      document.getElementById('detailView').classList.add('hidden');
+      document.getElementById('listView').classList.remove('hidden');
+      selectedTender = null;
+    }
+
+    async function submitDecision(status) {
+      if (!selectedTender) return;
+      const comment = document.getElementById('commentInput').value.trim();
+      alert(`Решение "${status}" принято зафиксировано!\nКомментарий: ${comment || 'нет'}`);
+      document.getElementById('commentInput').value = '';
+      showList();
+    }
+
+    window.onload = initApp;
   </script>
 </body>
 </html>
