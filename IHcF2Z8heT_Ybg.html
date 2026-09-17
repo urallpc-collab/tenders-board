@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>Согласование тендеров</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 font-sans">
+  <div class="max-w-md mx-auto">
+    
+    <!-- Шапка -->
+    <header class="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
+      <div>
+        <h1 class="text-xl font-bold text-emerald-400">Тендерный отдел</h1>
+        <p class="text-xs text-slate-400">На согласовании (Колонка 02)</p>
+      </div>
+      <button onclick="clearToken()" class="text-xs text-slate-500 hover:text-rose-400 underline">Выйти</button>
+    </header>
+
+    <!-- Форма авторизации Token (показывается, если не сохранен) -->
+    <div id="auth-card" class="bg-slate-800 p-5 rounded-2xl mb-6 border border-slate-700 shadow-xl">
+      <h2 class="text-sm font-semibold mb-2 text-slate-200">Авторизация доступа</h2>
+      <p class="text-xs text-slate-400 mb-4">Введите токен доступа GitHub (PAT) для управления тендерами.</p>
+      <input type="password" id="pat-token" class="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm mb-3 focus:outline-none focus:border-emerald-500 text-slate-100" placeholder="ghp_xxxxxxxxxxxx">
+      <button onclick="saveToken()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-semibold text-sm transition active:scale-95">Сохранить и войти</button>
+    </div>
+
+    <!-- Индикатор загрузки -->
+    <div id="loading" class="hidden text-center py-8 text-slate-400 text-sm">
+      Загрузка актуальных тендеров...
+    </div>
+
+    <!-- Список тендеров -->
+    <div id="tenders-container" class="space-y-4"></div>
+
+  </div>
+
+  <script>
+    const REPO_OWNER = 'urallpc-collab';
+    const REPO_NAME = 'tenders-board';
+
+    function getToken() {
+      return localStorage.getItem('gh_pat_token') || '';
+    }
+
+    function saveToken() {
+      const token = document.getElementById('pat-token').value.trim();
+      if (token) {
+        localStorage.setItem('gh_pat_token', token);
+        initDashboard();
+      }
+    }
+
+    function clearToken() {
+      localStorage.removeItem('gh_pat_token');
+      location.reload();
+    }
+
+    async function initDashboard() {
+      const token = getToken();
+      if (!token) {
+        document.getElementById('auth-card').classList.remove('hidden');
+        return;
+      }
+      document.getElementById('auth-card').classList.add('hidden');
+      document.getElementById('loading').classList.remove('hidden');
+
+      try {
+        // Получаем карточки из репозитория
+        const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues?state=open`, {
+          headers: { 'Authorization': `token ${token}` }
+        });
+        const issues = await res.json();
+        
+        document.getElementById('loading').classList.add('hidden');
+        renderTenders(issues);
+      } catch (err) {
+        alert('Ошибка загрузки данных. Проверьте токен.');
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('auth-card').classList.remove('hidden');
+      }
+    }
+
+    function renderTenders(issues) {
+      const container = document.getElementById('tenders-container');
+      container.innerHTML = '';
+
+      if (!issues || issues.length === 0) {
+        container.innerHTML = `<div class="text-center py-10 text-slate-500 text-sm">Нет тендеров, требующих согласования 🎉</div>`;
+        return;
+      }
+
+      issues.forEach(issue => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg space-y-4';
+        
+        card.innerHTML = `
+          <div>
+            <span class="text-xs font-mono text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">#${issue.number}</span>
+            <h3 class="text-base font-bold text-slate-100 mt-2 leading-snug">${issue.title}</h3>
+          </div>
+          
+          <div class="text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 whitespace-pre-line max-h-48 overflow-y-auto">
+            ${issue.body || 'Описание отсутствует.'}
+          </div>
+
+          <div class="space-y-2 pt-2 border-t border-slate-700/60">
+            <textarea id="comment-${issue.number}" class="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500" placeholder="Замечание или комментарий (необязательно)..." rows="2"></textarea>
+            
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="decision(${issue.number}, '03. Идем в торги')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold text-xs transition active:scale-95 shadow-md">
+                🟢 Согласовать
+              </button>
+              <button onclick="decision(${issue.number}, '04. Отказ')" class="w-full bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-xl font-bold text-xs transition active:scale-95 shadow-md">
+                🔴 Отклонить
+              </button>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    async function decision(issueNumber, targetStatus) {
+      const token = getToken();
+      const commentText = document.getElementById(`comment-${issueNumber}`).value.trim();
+
+      if (commentText) {
+        await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issueNumber}/comments`, {
+          method: 'POST',
+          headers: { 
+            'Authorization': `token ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ body: `**Решение руководителя:** ${commentText}` })
+        });
+      }
+
+      // Закрываем или обновляем issue
+      await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issueNumber}`, {
+        method: 'PATCH',
+        headers: { 
+          'Authorization': `token ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ state: targetStatus.includes('Отказ') ? 'closed' : 'open' })
+      });
+
+      initDashboard();
+    }
+
+    // Автостарт
+    initDashboard();
+  </script>
+</body>
+</html>
