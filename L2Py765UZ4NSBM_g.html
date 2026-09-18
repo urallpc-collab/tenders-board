@@ -77,6 +77,30 @@
       overflow-x: auto !important;
       white-space: nowrap !important;
     }
+	
+	/* Разрешаем перенос слов и текста внутри всех таблиц */
+#detail-body table {
+  width: 100% !important;
+  table-layout: auto;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+#detail-body th, 
+#detail-body td {
+  white-space: normal !important; /* Разрешает перенос на новую строку */
+  padding: 8px 10px;
+}
+
+/* Фиксируем минимальную ширину для первой колонки (Вопрос/Показатель) */
+#detail-body td:first-child,
+#detail-body th:first-child {
+  min-width: 110px;
+  max-width: 140px;
+  font-weight: 600;
+}
+	
+	
   }
   </style>
 </head>
