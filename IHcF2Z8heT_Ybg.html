@@ -126,13 +126,12 @@
 
         <div class="glass rounded-2xl overflow-hidden shadow-xl border border-slate-700">
           <table class="w-full text-left text-sm">
-            <thead class="bg-slate-800 text-slate-400 border-b border-slate-700">
-              <tr>
-                <th class="p-4 w-20">№</th>
-                <th class="p-4">Название тендера</th>
-                <th class="p-4 text-right w-32">Действие</th>
-              </tr>
-            </thead>
+				<thead class="bg-slate-800 text-slate-400 border-b border-slate-700">
+				  <tr>
+					<th class="p-3 md:p-4 w-12 md:w-20">№</th>
+					<th class="p-3 md:p-4">Название тендера</th>
+				  </tr>
+				</thead>
             <tbody id="tenders-table-body" class="divide-y divide-slate-700/60">
             </tbody>
           </table>
@@ -197,223 +196,268 @@
   </div>
 
   <script>
-    const REPO_OWNER = 'urallpc-collab';
-    const REPO_NAME = 'tenders-board';
-    let issuesStore = [];
-    let currentTab = 'open'; // 'open' или 'closed'
+  const REPO_OWNER = 'urallpc-collab';
+  const REPO_NAME = 'tenders-board';
+  let issuesStore = [];
+  let currentTab = 'open'; // 'open' или 'closed'
 
-    function getToken() { return localStorage.getItem('gh_pat_token') || ''; }
+  // Получение токена
+  function getToken() { 
+    return localStorage.getItem('gh_pat_token') || ''; 
+  }
 
-    function saveToken() {
-      const token = document.getElementById('pat-token').value.trim();
-      if (token) {
-        localStorage.setItem('gh_pat_token', token);
-        initDashboard();
-      }
+  function saveToken() {
+    const token = document.getElementById('pat-token').value.trim();
+    if (token) {
+      localStorage.setItem('gh_pat_token', token);
+      initDashboard();
+    }
+  }
+
+  function clearToken() {
+    localStorage.removeItem('gh_pat_token');
+    location.reload();
+  }
+
+  // Логика прочитанных тендеров для текущего ключа
+  function getReadTenders() {
+    const token = getToken();
+    if (!token) return [];
+    const readData = localStorage.getItem(`read_tenders_${token}`);
+    try {
+      return readData ? JSON.parse(readData) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function markAsRead(issueNumber) {
+    const token = getToken();
+    if (!token) return;
+    const readList = getReadTenders();
+    if (!readList.includes(issueNumber)) {
+      readList.push(issueNumber);
+      localStorage.setItem(`read_tenders_${token}`, JSON.stringify(readList));
+    }
+  }
+
+  // Переключение вкладок
+  async function switchTab(tab) {
+    currentTab = tab;
+    
+    const tabOpen = document.getElementById('tab-open');
+    const tabClosed = document.getElementById('tab-closed');
+
+    if (tab === 'open') {
+      tabOpen.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white transition';
+      tabClosed.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition';
+    } else {
+      tabClosed.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 text-white transition';
+      tabOpen.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition';
     }
 
-    function clearToken() {
-      localStorage.removeItem('gh_pat_token');
-      location.reload();
-    }
+    await initDashboard();
+  }
 
-    async function switchTab(tab) {
-      currentTab = tab;
-      
-      const tabOpen = document.getElementById('tab-open');
-      const tabClosed = document.getElementById('tab-closed');
-
-      if (tab === 'open') {
-        tabOpen.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white transition';
-        tabClosed.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition';
-      } else {
-        tabClosed.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 text-white transition';
-        tabOpen.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition';
-      }
-
-      await initDashboard();
-    }
-
-    async function initDashboard() {
-      const token = getToken();
-      if (!token) {
-        document.getElementById('auth-card').classList.remove('hidden');
-        document.getElementById('app-content').classList.add('hidden');
-        return;
-      }
-
-      document.getElementById('auth-card').classList.add('hidden');
-      document.getElementById('loading').classList.remove('hidden');
+  // Инициализация панели
+  async function initDashboard() {
+    const token = getToken();
+    if (!token) {
+      document.getElementById('auth-card').classList.remove('hidden');
       document.getElementById('app-content').classList.add('hidden');
-
-      try {
-        const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues?state=${currentTab}`, {
-          headers: { 'Authorization': `token ${token}` }
-        });
-        issuesStore = await res.json();
-
-        document.getElementById('loading').classList.add('hidden');
-        document.getElementById('app-content').classList.remove('hidden');
-        
-        renderTable();
-        showList();
-      } catch (err) {
-        alert('Ошибка загрузки данных. Проверьте токен.');
-        document.getElementById('loading').classList.add('hidden');
-        document.getElementById('auth-card').classList.remove('hidden');
-      }
+      return;
     }
 
-    function renderTable() {
-      const tbody = document.getElementById('tenders-table-body');
-      tbody.innerHTML = '';
+    document.getElementById('auth-card').classList.add('hidden');
+    document.getElementById('loading').classList.remove('hidden');
+    document.getElementById('app-content').classList.add('hidden');
 
-      if (!issuesStore || issuesStore.length === 0) {
-        const msg = currentTab === 'open' ? 'Нет тендеров на согласовании 🎉' : 'Нет отклоненных тендеров 👌';
-        tbody.innerHTML = `<tr><td colspan="3" class="p-8 text-center text-slate-500 text-sm">${msg}</td></tr>`;
+    try {
+      const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues?state=${currentTab}`, {
+        headers: { 'Authorization': `token ${token}` }
+      });
+      issuesStore = await res.json();
+
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('app-content').classList.remove('hidden');
+      
+      renderTable();
+      showList();
+    } catch (err) {
+      alert('Ошибка загрузки данных. Проверьте токен.');
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('auth-card').classList.remove('hidden');
+    }
+  }
+
+  // Рендер таблицы (без кнопки "Открыть" и с подсветкой прочитанных)
+  function renderTable() {
+    const tbody = document.getElementById('tenders-table-body');
+    tbody.innerHTML = '';
+
+    if (!issuesStore || issuesStore.length === 0) {
+      const msg = currentTab === 'open' ? 'Нет тендеров на согласовании 🎉' : 'Нет отклоненных тендеров 👌';
+      tbody.innerHTML = `<tr><td colspan="2" class="p-8 text-center text-slate-500 text-sm">${msg}</td></tr>`;
+      return;
+    }
+
+    const readList = getReadTenders();
+
+    issuesStore.forEach(issue => {
+      const isRead = readList.includes(issue.number);
+      const tr = document.createElement('tr');
+      
+      const textStyle = isRead ? 'text-slate-500 font-normal' : 'text-slate-100 font-semibold';
+      const bgStyle = isRead ? 'bg-slate-900/40 opacity-60 hover:opacity-100' : 'hover:bg-slate-800/60';
+
+      tr.className = `${bgStyle} transition cursor-pointer`;
+      tr.onclick = () => openDetail(issue.number);
+
+      tr.innerHTML = `
+        <td class="p-3 md:p-4 font-mono text-xs ${isRead ? 'text-slate-600' : 'text-emerald-400'}">#${issue.number}</td>
+        <td class="p-3 md:p-4 text-sm ${textStyle}">${issue.title}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Открытие деталей тендера
+  async function openDetail(issueNumber) {
+    const issue = issuesStore.find(i => i.number === issueNumber);
+    if (!issue) return;
+
+    markAsRead(issue.number);
+    renderTable();
+
+    document.getElementById('detail-number').innerText = `#${issue.number}`;
+    document.getElementById('detail-title').innerText = issue.title;
+    
+    const badge = document.getElementById('detail-status-badge');
+    if (issue.state === 'closed') {
+      badge.innerText = 'Отклонен';
+      badge.className = 'text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider bg-rose-950 text-rose-400 border border-rose-800';
+      document.getElementById('actions-open').classList.add('hidden');
+      document.getElementById('actions-closed').classList.remove('hidden');
+    } else {
+      badge.innerText = 'На согласовании';
+      badge.className = 'text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider bg-emerald-950 text-emerald-400 border border-emerald-800';
+      document.getElementById('actions-open').classList.remove('hidden');
+      document.getElementById('actions-closed').classList.add('hidden');
+    }
+
+	// --- РЕНДЕР ИСХОДНОГО MARKDOWN (КАК НА GITHUB) ---
+		let rawText = issue.body || 'Описание отсутствует.';
+
+		// 1. Нормализуем переносы строк (\r\n -> \n)
+		rawText = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+		// 2. Вырезаем только тяжелый мусор от Word, если текст вставляли из Word
+		rawText = rawText.replace(/<style[\s\S]*?<\/style>/gi, '');
+		rawText = rawText.replace(/<!--[\s\S]*?-->/g, '');
+
+		// 3. Вывод в контейнер с флагами GitHub Flavored Markdown
+		const detailBody = document.getElementById('detail-body');
+		if (detailBody) {
+		  if (typeof marked !== 'undefined') {
+		    marked.setOptions({ 
+		      gfm: true,        // GitHub Flavored Markdown
+		      breaks: true      // Перенос строки при одиночном \n (как в комментариях GitHub)
+		    });
+		    detailBody.innerHTML = marked.parse(rawText);
+		  } else {
+		    detailBody.innerText = rawText;
+		  }
+		}
+		// -----------------------------------------------------------------
+
+
+
+    document.getElementById('detail-comment').value = '';
+
+    document.getElementById('btn-send-comment').onclick = () => addCommentOnly(issue.number);
+    document.getElementById('btn-approve').onclick = () => decision(issue.number, 'approve');
+    document.getElementById('btn-reject').onclick = () => decision(issue.number, 'reject');
+    document.getElementById('btn-reopen').onclick = () => decision(issue.number, 'reopen');
+
+    await loadComments(issue.number);
+
+    document.getElementById('view-list').classList.add('hidden');
+    document.getElementById('view-detail').classList.remove('hidden');
+  }
+
+  // Загрузка комментариев
+  async function loadComments(issueNumber) {
+    const token = getToken();
+    const container = document.getElementById('comments-container');
+    container.innerHTML = `<p class="text-xs text-slate-500">Загрузка комментариев...</p>`;
+
+    try {
+      const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issueNumber}/comments`, {
+        headers: { 'Authorization': `token ${token}` }
+      });
+      const comments = await res.json();
+
+      if (!comments || comments.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-500 italic">Комментариев и решений пока нет.</p>`;
         return;
       }
 
-      issuesStore.forEach(issue => {
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-slate-800/60 transition cursor-pointer';
-        tr.onclick = () => openDetail(issue.number);
-        tr.innerHTML = `
-          <td class="p-4 font-mono text-xs text-emerald-400">#${issue.number}</td>
-          <td class="p-4 font-semibold text-slate-100">${issue.title}</td>
-          <td class="p-4 text-right">
-            <button class="bg-slate-700 hover:bg-slate-600 text-xs px-3 py-1.5 rounded-lg text-emerald-400 transition">Открыть →</button>
-          </td>
+      container.innerHTML = '';
+      comments.forEach(c => {
+        const item = document.createElement('div');
+        item.className = 'bg-slate-900/90 border border-slate-800 p-3 rounded-lg text-xs text-slate-300';
+        
+        const cleanBody = c.body.replace(/^\*\*Решение руководителя:\*\*\s*/i, '');
+
+        item.innerHTML = `
+          <div class="flex justify-between items-center mb-1">
+            <span class="font-bold text-emerald-400">${c.user.login === 'urallpc-collab' ? 'Руслан' : c.user.login}</span>
+            <span class="text-[10px] text-slate-500">${new Date(c.created_at).toLocaleString('ru-RU')}</span>
+          </div>
+          <div class="whitespace-pre-line text-slate-200">${cleanBody}</div>
         `;
-        tbody.appendChild(tr);
+        container.appendChild(item);
       });
+    } catch (e) {
+      container.innerHTML = `<p class="text-xs text-rose-400">Ошибка загрузки комментариев.</p>`;
     }
-
- 
- async function openDetail(issueNumber) {
-  const issue = issuesStore.find(i => i.number === issueNumber);
-  if (!issue) return;
-
-  document.getElementById('detail-number').innerText = `#${issue.number}`;
-  document.getElementById('detail-title').innerText = issue.title;
-  
-  const badge = document.getElementById('detail-status-badge');
-  if (issue.state === 'closed') {
-    badge.innerText = 'Отклонен';
-    badge.className = 'text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider bg-rose-950 text-rose-400 border border-rose-800';
-    document.getElementById('actions-open').classList.add('hidden');
-    document.getElementById('actions-closed').classList.remove('hidden');
-  } else {
-    badge.innerText = 'На согласовании';
-    badge.className = 'text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider bg-emerald-950 text-emerald-400 border border-emerald-800';
-    document.getElementById('actions-open').classList.remove('hidden');
-    document.getElementById('actions-closed').classList.add('hidden');
   }
 
-// --- ПОЛНОЕ ПРЕОБРАЗОВАНИЕ HTML-МУСОРА В ЧИСТЫЙ GITHUB MARKDOWN ---
-// --- ПОЛНОЕ УДАЛЕНИЕ СЛУЖЕБНЫХ ДАННЫХ WORD И РЕНДЕР MARKDOWN ---
-  let rawText = issue.body || 'Описание отсутствует.';
+  // Отправка комментария
+  async function addCommentOnly(issueNumber) {
+    const token = getToken();
+    const textarea = document.getElementById('detail-comment');
+    const commentText = textarea.value.trim();
 
-  // 1. Полностью вырезаем блоки style, script, head, xml вместе со ВСЕМ их содержимым
-  rawText = rawText.replace(/<style[\s\S]*?<\/style>/gi, '');
-  rawText = rawText.replace(/<script[\s\S]*?<\/script>/gi, '');
-  rawText = rawText.replace(/<head[\s\S]*?<\/head>/gi, '');
-  rawText = rawText.replace(/<xml[\s\S]*?<\/xml>/gi, '');
-  rawText = rawText.replace(/<!--[\s\S]*?-->/g, ''); // вырезаем комментарии Word
+    if (!commentText) return;
 
-  // 2. Вырезаем отдельные служебные мета-теги и теги Office
-  rawText = rawText.replace(/<meta[\s\S]*?>/gi, '');
-  rawText = rawText.replace(/<\/?o:[^>]*>/gi, '');
-  rawText = rawText.replace(/<\/?v:[^>]*>/gi, '');
-  rawText = rawText.replace(/<\/?w:[^>]*>/gi, '');
+    textarea.disabled = true;
+    await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issueNumber}/comments`, {
+      method: 'POST',
+      headers: { 
+        'Authorization': `token ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ body: commentText })
+    });
 
-  // 3. Убираем центрирование и атрибуты стилей/классов
-  rawText = rawText.replace(/<center[\s\S]*?>/gi, '');
-  rawText = rawText.replace(/<\/center>/gi, '');
-  rawText = rawText.replace(/\s*style\s*=\s*(['"])(.*?)\1/gi, '');
-  rawText = rawText.replace(/\s*class\s*=\s*(['"])(.*?)\1/gi, '');
-
-  // 4. Превращаем структурные HTML-теги в абзацы Markdown
-  rawText = rawText.replace(/<\/(p|div|h1|h2|h3|h4|tr)>/gi, '\n\n');
-  rawText = rawText.replace(/<br\s*\/?>/gi, '\n');
-
-  // 5. Вычищаем любые оставшиеся незнакомые HTML-теги
-  rawText = rawText.replace(/<(?!\/?(table|tr|td|th|thead|tbody|b|strong|i|em|strike|code|pre|a)\b)[^>]+>/gi, '');
-
-  // 6. Подчищаем мусорные текстовые обрезки Word, если они случайно остались
-  rawText = rawText.replace(/Normal\s+0/gi, '');
-  rawText = rawText.replace(/false\s+false\s+false/gi, '');
-  rawText = rawText.replace(/RU\s+X-NONE\s+X-NONE/gi, '');
-
-  // 7. Форматируем отступы и выводим
-  rawText = rawText.replace(/^\t+/gm, '');
-  rawText = rawText.replace(/\n{3,}/g, '\n\n').trim();
-
-  const detailBody = document.getElementById('detail-body');
-  if (detailBody) {
-    detailBody.innerHTML = typeof marked !== 'undefined' ? marked.parse(rawText) : rawText;
+    textarea.value = '';
+    textarea.disabled = false;
+    await loadComments(issueNumber);
   }
-  // -----------------------------------------------------------------
-  // --------------------------------------------------------
 
-  document.getElementById('detail-comment').value = '';
+  // Возврат к списку
+  function showList() {
+    document.getElementById('view-detail').classList.add('hidden');
+    document.getElementById('view-list').classList.remove('hidden');
+  }
 
-  document.getElementById('btn-send-comment').onclick = () => addCommentOnly(issue.number);
-  document.getElementById('btn-approve').onclick = () => decision(issue.number, 'approve');
-  document.getElementById('btn-reject').onclick = () => decision(issue.number, 'reject');
-  document.getElementById('btn-reopen').onclick = () => decision(issue.number, 'reopen');
+  // Принятие решения (согласование / отклонение)
+  async function decision(issueNumber, action) {
+    const token = getToken();
+    const commentText = document.getElementById('detail-comment').value.trim();
 
-  await loadComments(issue.number);
-
-  document.getElementById('view-list').classList.add('hidden');
-  document.getElementById('view-detail').classList.remove('hidden');
-}
-
-    async function loadComments(issueNumber) {
-      const token = getToken();
-      const container = document.getElementById('comments-container');
-      container.innerHTML = `<p class="text-xs text-slate-500">Загрузка комментариев...</p>`;
-
-      try {
-        const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issueNumber}/comments`, {
-          headers: { 'Authorization': `token ${token}` }
-        });
-        const comments = await res.json();
-
-        if (!comments || comments.length === 0) {
-          container.innerHTML = `<p class="text-xs text-slate-500 italic">Комментариев и решений пока нет.</p>`;
-          return;
-        }
-
-        container.innerHTML = '';
-        comments.forEach(c => {
-          const item = document.createElement('div');
-          item.className = 'bg-slate-900/90 border border-slate-800 p-3 rounded-lg text-xs text-slate-300';
-          
-          const cleanBody = c.body.replace(/^\*\*Решение руководителя:\*\*\s*/i, '');
-
-          item.innerHTML = `
-            <div class="flex justify-between items-center mb-1">
-              <span class="font-bold text-emerald-400">${c.user.login === 'urallpc-collab' ? 'Руслан' : c.user.login}</span>
-              <span class="text-[10px] text-slate-500">${new Date(c.created_at).toLocaleString('ru-RU')}</span>
-            </div>
-            <div class="whitespace-pre-line text-slate-200">${cleanBody}</div>
-          `;
-          container.appendChild(item);
-        });
-      } catch (e) {
-        container.innerHTML = `<p class="text-xs text-rose-400">Ошибка загрузки комментариев.</p>`;
-      }
-    }
-
-    async function addCommentOnly(issueNumber) {
-      const token = getToken();
-      const textarea = document.getElementById('detail-comment');
-      const commentText = textarea.value.trim();
-
-      if (!commentText) return;
-
-      textarea.disabled = true;
+    if (commentText) {
       await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issueNumber}/comments`, {
         method: 'POST',
         headers: { 
@@ -422,48 +466,23 @@
         },
         body: JSON.stringify({ body: commentText })
       });
-
-      textarea.value = '';
-      textarea.disabled = false;
-      await loadComments(issueNumber);
     }
 
-    function showList() {
-      document.getElementById('view-detail').classList.add('hidden');
-      document.getElementById('view-list').classList.remove('hidden');
-    }
+    const newState = action === 'reject' ? 'closed' : 'open';
 
-    async function decision(issueNumber, action) {
-      const token = getToken();
-      const commentText = document.getElementById('detail-comment').value.trim();
-
-      if (commentText) {
-        await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issueNumber}/comments`, {
-          method: 'POST',
-          headers: { 
-            'Authorization': `token ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ body: commentText })
-        });
-      }
-
-      // Определяем новый статус (open / closed)
-      const newState = action === 'reject' ? 'closed' : 'open';
-
-      await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issueNumber}`, {
-        method: 'PATCH',
-        headers: { 
-          'Authorization': `token ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ state: newState })
-      });
-
-      initDashboard();
-    }
+    await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issueNumber}`, {
+      method: 'PATCH',
+      headers: { 
+        'Authorization': `token ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ state: newState })
+    });
 
     initDashboard();
-  </script>
+  }
+
+  initDashboard();
+</script>
 </body>
 </html>
