@@ -77,6 +77,18 @@
       overflow-x: auto !important;
       white-space: nowrap !important;
     }
+	    /* Перенос статуса, если не влезает в заголовок */
+    #view-detail .border-b {
+      flex-direction: column !important;
+      gap: 8px !important;
+    }
+
+    /* Фикс горизонтального скролла для таблиц на телефоне */
+    .markdown-body table {
+      display: block !important;
+      overflow-x: auto !important;
+      white-space: nowrap !important;
+    }
 	
 	/* Разрешаем перенос слов и текста внутри всех таблиц */
 #detail-body table {
@@ -99,8 +111,6 @@
   max-width: 140px;
   font-weight: 600;
 }
-	
-	
   }
   </style>
 </head>
@@ -183,8 +193,9 @@
 			<div id="detail-body" class="markdown-body"></div>
           </div>
 
-          <div class="border-t border-slate-700/80 pt-4 space-y-3">
-            <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">История решений и комментарии</h3>
+			
+			<div id="decision-section" class="border-t border-slate-700/80 pt-4 space-y-3">
+			  <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">История решений и комментарии</h3>
             <div id="comments-container" class="space-y-2 max-h-48 overflow-y-auto">
             </div>
           </div>
@@ -253,6 +264,48 @@
     localStorage.removeItem('gh_pat_token');
     location.reload();
   }
+  
+  // Функция плавного скролла к блоку комментариев и кнопок
+  function scrollToDecisionBlock() {
+    const section = document.getElementById('decision-section');
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  // Показ/скрытие полоски при скролле
+  window.addEventListener('scroll', () => {
+    const btn = document.getElementById('scroll-bottom-btn');
+    const viewDetail = document.getElementById('view-detail');
+
+    // Показываем кнопку только на экране деталей
+    if (!viewDetail || viewDetail.classList.contains('hidden')) {
+      btn.classList.add('hidden');
+      return;
+    }
+
+    const scrollPosition = window.innerHeight + window.scrollY;
+    const threshold = document.documentElement.scrollHeight - 180; // 180px до самого низа
+
+    // Если еще не дошли до низа — показываем кнопку
+    if (scrollPosition < threshold) {
+      btn.classList.remove('hidden');
+    } else {
+      btn.classList.add('hidden');
+    }
+  });
+  
+  function showList(isBrowserBack = false) {
+  const scrollBtn = document.getElementById('scroll-bottom-btn');
+  if (scrollBtn) scrollBtn.classList.add('hidden');
+  
+  document.getElementById('view-detail').classList.add('hidden');
+  document.getElementById('view-list').classList.remove('hidden');
+
+  if (!isBrowserBack && history.state && history.state.view === 'detail') {
+    history.back();
+  }
+}
 
   // Работа с локальными статусами (чтобы скрыть лаг GitHub API)
   function getLocalOverrides() {
@@ -615,5 +668,11 @@
   });
   initDashboard();
 </script>
+<!-- Тонкая аккуратная полоска для быстрого скролла вниз/вверх -->
+<div id="scroll-bottom-btn" class="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 hidden transition-all duration-300">
+  <button onclick="scrollToDecisionBlock()" title="Перейти к решению и комментариям" class="group flex items-center justify-center bg-slate-950/90 hover:bg-slate-900 text-slate-400 hover:text-emerald-400 px-12 py-1 rounded-t-xl border-t border-x border-slate-800 shadow-2xl backdrop-blur-md transition-all active:scale-95">
+    <span id="scroll-arrow" class="text-[10px] font-bold transition-transform duration-300 transform group-hover:translate-y-0.5">▼</span>
+  </button>
+</div>
 </body>
 </html>
