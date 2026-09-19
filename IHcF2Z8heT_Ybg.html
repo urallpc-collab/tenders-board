@@ -273,39 +273,40 @@
     }
   }
 
-  // Показ/скрытие полоски при скролле
-  window.addEventListener('scroll', () => {
-    const btn = document.getElementById('scroll-bottom-btn');
-    const viewDetail = document.getElementById('view-detail');
+	// Показ/скрытие полоски при скролле (СТРОГО только на экране деталей)
+	  window.addEventListener('scroll', () => {
+		const btn = document.getElementById('scroll-bottom-btn');
+		const viewDetail = document.getElementById('view-detail');
 
-    // Показываем кнопку только на экране деталей
-    if (!viewDetail || viewDetail.classList.contains('hidden')) {
-      btn.classList.add('hidden');
-      return;
-    }
+		// Если мы НЕ на экране деталей тендера — кнопка ЖЕСТКО скрыта и дальше код не идет
+		if (!viewDetail || viewDetail.classList.contains('hidden')) {
+		  if (btn) btn.classList.add('hidden');
+		  return;
+		}
 
-    const scrollPosition = window.innerHeight + window.scrollY;
-    const threshold = document.documentElement.scrollHeight - 180; // 180px до самого низа
+		const scrollPosition = window.innerHeight + window.scrollY;
+		const threshold = document.documentElement.scrollHeight - 180; // 180px до самого низа
 
-    // Если еще не дошли до низа — показываем кнопку
-    if (scrollPosition < threshold) {
-      btn.classList.remove('hidden');
-    } else {
-      btn.classList.add('hidden');
-    }
-  });
+		// Если еще не дошли до низа — показываем кнопку
+		if (scrollPosition < threshold) {
+		  btn.classList.remove('hidden');
+		} else {
+		  btn.classList.add('hidden');
+		}
+	  });
   
-  function showList(isBrowserBack = false) {
-  const scrollBtn = document.getElementById('scroll-bottom-btn');
-  if (scrollBtn) scrollBtn.classList.add('hidden');
-  
-  document.getElementById('view-detail').classList.add('hidden');
-  document.getElementById('view-list').classList.remove('hidden');
+		function showList(isBrowserBack = false) {
+			// Принудительно скрываем кнопку скролла
+			const scrollBtn = document.getElementById('scroll-bottom-btn');
+			if (scrollBtn) scrollBtn.classList.add('hidden');
 
-  if (!isBrowserBack && history.state && history.state.view === 'detail') {
-    history.back();
-  }
-}
+			document.getElementById('view-detail').classList.add('hidden');
+			document.getElementById('view-list').classList.remove('hidden');
+
+			if (!isBrowserBack && history.state && history.state.view === 'detail') {
+			  history.back();
+			}
+		  }
 
   // Работа с локальными статусами (чтобы скрыть лаг GitHub API)
   function getLocalOverrides() {
