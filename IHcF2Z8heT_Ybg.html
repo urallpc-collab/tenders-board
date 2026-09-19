@@ -596,16 +596,6 @@
     await loadComments(issueNumber);
   }
 
-		function showList(isBrowserBack = false) {
-		  document.getElementById('view-detail').classList.add('hidden');
-		  document.getElementById('view-list').classList.remove('hidden');
-
-		  // Если нажали на кнопку на сайте, а не системную назад
-		  if (!isBrowserBack && history.state && history.state.view === 'detail') {
-			history.back();
-		  }
-		}
-
   // Принятие решения с записью локального кэша
   async function decision(issueNumber, action) {
     const token = getToken();
@@ -661,6 +651,10 @@
   }
 // Перехват системной кнопки "Назад" в браузере/на телефоне
   window.addEventListener('popstate', (event) => {
+    // Гасим кнопку при ЛЮБОМ навигационном сдвиге назад
+    const scrollBtn = document.getElementById('scroll-bottom-btn');
+    if (scrollBtn) scrollBtn.classList.add('hidden');
+
     if (event.state && event.state.view === 'detail') {
       openDetail(event.state.issueNumber);
     } else {
