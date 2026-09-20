@@ -465,6 +465,7 @@ function renderTable() {
   }
 
   async function openDetail(issueNumber) {
+	window.scrollTo({ top: 0, behavior: 'instant' });	
     const issue = issuesStore.find(i => i.number === issueNumber);
     if (!issue) return;
 
