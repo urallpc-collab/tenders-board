@@ -427,7 +427,7 @@
     }
   }
 
-  function renderTable() {
+function renderTable() {
     const tbody = document.getElementById('tenders-table-body');
     tbody.innerHTML = '';
 
@@ -446,14 +446,17 @@
       const isRead = readList.includes(issue.number);
       const tr = document.createElement('tr');
 
-      const textStyle = isRead ? 'text-slate-500 font-normal' : 'text-slate-100 font-semibold';
-      const bgStyle = isRead ? 'bg-slate-900/40 opacity-60 hover:opacity-100' : 'hover:bg-slate-800/60';
+      // 1. Для прочитанных заголовков берем более светлый серый text-slate-400 вместо text-slate-500
+      // 2. Убираем opacity-60, чтобы зеленый цвет № не тускнел
+      const textStyle = isRead ? 'text-slate-400 font-normal' : 'text-slate-100 font-semibold';
+      const bgStyle = isRead ? 'bg-slate-900/30 hover:bg-slate-800/50' : 'hover:bg-slate-800/60';
 
       tr.className = `${bgStyle} transition cursor-pointer`;
       tr.onclick = () => openDetail(issue.number);
 
+      // Номер всегда остается ярко-зеленым (text-emerald-400)
       tr.innerHTML = `
-        <td class="p-3 md:p-4 font-mono text-xs ${isRead ? 'text-slate-600' : 'text-emerald-400'}">#${issue.number}</td>
+        <td class="p-3 md:p-4 font-mono text-xs text-emerald-400 font-medium">#${issue.number}</td>
         <td class="p-3 md:p-4 text-sm ${textStyle}">${issue.title}</td>
       `;
       tbody.appendChild(tr);
